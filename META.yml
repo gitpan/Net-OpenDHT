@@ -1,0 +1,19 @@
+---
+name: Net-OpenDHT
+version: 0.29
+author:
+  - Leon Brocard <acme@astray.com>.
+abstract: Access the Open Distributed Hash Table (Open DHT)
+license: perl
+requires:
+  Class::Accessor::Chained::Fast: 0
+  LWP::UserAgent: 0
+  MIME::Base64: 0
+  Test::Exception: 0
+  Test::More: 0
+  XML::Writer: 0
+provides:
+  Net::OpenDHT:
+    file: lib/Net/OpenDHT.pm
+    version: 0.29
+generated_by: Module::Build version 0.261
