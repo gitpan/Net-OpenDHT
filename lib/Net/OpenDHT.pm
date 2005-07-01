@@ -7,7 +7,7 @@ use MIME::Base64;
 use XML::LibXML;
 use base 'Class::Accessor::Chained::Fast';
 __PACKAGE__->mk_accessors(qw(ttl application server));
-our $VERSION = 0.29;
+our $VERSION = '0.30';
 our $VALUES = 100;
 
 my $ua = LWP::UserAgent->new();

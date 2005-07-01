@@ -11,7 +11,7 @@ my $build = Module::Build->new(
     'Test::Exception'                => '0',
     'LWP::UserAgent'                 => '0',
     'MIME::Base64'                   => '0',
-    'XML::Writer'                    => '0',
+    'XML::LibXML'                    => '0',
   },
 );
 $build->create_build_script;

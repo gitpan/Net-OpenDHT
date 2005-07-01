@@ -11,8 +11,8 @@ WriteMakefile
                            'Class::Accessor::Chained::Fast' => '0',
                            'Test::Exception' => '0',
                            'LWP::UserAgent' => '0',
-                           'XML::Writer' => '0',
-                           'MIME::Base64' => '0'
+                           'MIME::Base64' => '0',
+                           'XML::LibXML' => '0'
                          }
         )
 ;
