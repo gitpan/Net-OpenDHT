@@ -61,10 +61,10 @@ METHODS
       $dht->put($key, $value, $ttl);
 
   server
-    You should pick a local server to access the DHT from. Pick a
-    geographically or network-close server from:
-
-      http://appmanager.berkeley.intel-research.net/plcontrol/apps.php?appid=1001&GROUP=ANY&BUILD=ANY&CSTATUS=STATUS-3&RSTATUS=STATUS-3&GO=GO
+    The module automatically finds a topologically-close gateway to the DHT.
+    It will initially start up slowly as it tries to discover a fast gateway
+    but this information will be cached for a day. You may override this and
+    provide your own gateway with this method:
 
       $dht->server($server);
 

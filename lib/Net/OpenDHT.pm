@@ -2,20 +2,62 @@ package Net::OpenDHT;
 use strict;
 use warnings;
 use HTTP::Request;
+use List::Util qw(shuffle);
+use App::Cache;
 use LWP::UserAgent;
 use MIME::Base64;
+use Time::HiRes qw(time);
 use XML::LibXML;
 use base 'Class::Accessor::Chained::Fast';
 __PACKAGE__->mk_accessors(qw(ttl application server));
-our $VERSION = '0.30';
+our $VERSION = '0.31';
 our $VALUES = 100;
 
 my $ua = LWP::UserAgent->new();
 
+sub new {
+  my $class = shift;
+  my $self  = $class->SUPER::new(@_);
+  unless ($self->server) {
+    my $cache = App::Cache->new({ ttl => 24*60*60 });
+    my $server = $cache->get_code("server", sub { $self->_find_server() });
+    $self->server($server);
+  }
+  return $self;
+}
+
+sub _find_server {
+  my $self = shift;
+  my $url = 'http://appmanager.berkeley.intel-research.net/plcontrol/apps.php?appid=1001&GROUP=ANY&BUILD=ANY&CSTATUS=STATUS-3&RSTATUS=STATUS-3&GO=GO';
+  my $request = HTTP::Request->new(GET => $url);
+  my $response = $ua->request($request);
+  die "Error fetching $url" unless $response->is_success;
+  my $html = $response->content;
+  my @hosts;
+  while ($html =~ m{<TR><TD><FONT SIZE=2>(.+?)</FONT></TD>}g) {
+    push @hosts, $1;
+  }
+  @hosts = (shuffle @hosts)[0..15];
+  my($fastest_time, $fastest_host) = (999, "");
+  foreach my $host (@hosts) {
+    $request = HTTP::Request->new(GET => "http://$host:5851");
+    my $response = $ua->request($request);
+    my $start = time;
+    $response = $ua->request($request);
+    next unless $response->is_success;
+    my $time = time - $start;
+    if ($time < $fastest_time) {
+      $fastest_time = $time;
+      $fastest_host = $host;
+    }
+  }
+  return $fastest_host;
+}
+
 sub _make_request {
  my($self, $xml) = @_;
 
-  my $server = $self->server || 'planetlab9.millennium.berkeley.edu';
+  my $server = $self->server || die "No server";
   my $request = HTTP::Request->new(POST => "http://$server:5851/");
   $request->header(Content_Type => 'text/xml');
   $request->protocol('HTTP/1.0');
@@ -231,10 +273,10 @@ pass in a time to live in seconds:
 
 =head2 server
 
-You should pick a local server to access the DHT from. Pick a
-geographically or network-close server from:
-
-  http://appmanager.berkeley.intel-research.net/plcontrol/apps.php?appid=1001&GROUP=ANY&BUILD=ANY&CSTATUS=STATUS-3&RSTATUS=STATUS-3&GO=GO
+The module automatically finds a topologically-close gateway to the DHT.
+It will initially start up slowly as it tries to discover a fast gateway
+but this information will be cached for a day. You may override this and
+provide your own gateway with this method:
 
   $dht->server($server);
 

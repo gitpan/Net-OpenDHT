@@ -7,10 +7,13 @@ my $build = Module::Build->new(
   module_name        => 'Net::OpenDHT',
   requires           => {
     'Test::More'                     => '0',
+    'App::Cache'                     => '0',
     'Class::Accessor::Chained::Fast' => '0',
     'Test::Exception'                => '0',
+    'List::Util'                     => '0',
     'LWP::UserAgent'                 => '0',
     'MIME::Base64'                   => '0',
+    'Time::HiRes'                    => '0',
     'XML::LibXML'                    => '0',
   },
 );

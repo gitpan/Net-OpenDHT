@@ -1,19 +1,22 @@
 ---
 name: Net-OpenDHT
-version: 0.30
+version: 0.31
 author:
   - Leon Brocard <acme@astray.com>.
 abstract: Access the Open Distributed Hash Table (Open DHT)
 license: perl
 requires:
+  App::Cache: 0
   Class::Accessor::Chained::Fast: 0
   LWP::UserAgent: 0
+  List::Util: 0
   MIME::Base64: 0
   Test::Exception: 0
   Test::More: 0
+  Time::HiRes: 0
   XML::LibXML: 0
 provides:
   Net::OpenDHT:
     file: lib/Net/OpenDHT.pm
-    version: 0.30
-generated_by: Module::Build version 0.261
+    version: 0.31
+generated_by: Module::Build version 0.2611

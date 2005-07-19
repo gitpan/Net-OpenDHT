@@ -1,0 +1,11 @@
+Revision history for Perl module Net::OpenDHT:
+
+0.31 Tue Jul 19 19:12:52 BST 2005
+  - include CHANGES in the manifest
+  - automatically find a topologically-close gateway to the DHT
+
+0.30 Sat Jul  2 00:21:52 BST 2005
+  - mention XML::LibXML as a prereq (noticed by inkdroid)
+
+0.29 Fri May 20 22:42:39 BST 2005
+  - first release

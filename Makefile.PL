@@ -7,9 +7,12 @@ WriteMakefile
           'NAME' => 'Net::OpenDHT',
           'VERSION_FROM' => 'lib/Net/OpenDHT.pm',
           'PREREQ_PM' => {
-                           'Test::More' => '0',
-                           'Class::Accessor::Chained::Fast' => '0',
                            'Test::Exception' => '0',
+                           'Time::HiRes' => '0',
+                           'App::Cache' => '0',
+                           'Test::More' => '0',
+                           'List::Util' => '0',
+                           'Class::Accessor::Chained::Fast' => '0',
                            'LWP::UserAgent' => '0',
                            'MIME::Base64' => '0',
                            'XML::LibXML' => '0'
