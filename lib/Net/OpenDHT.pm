@@ -9,21 +9,26 @@ use MIME::Base64;
 use Time::HiRes qw(time);
 use XML::LibXML;
 use base 'Class::Accessor::Chained::Fast';
-__PACKAGE__->mk_accessors(qw(ttl application server));
-our $VERSION = '0.31';
+__PACKAGE__->mk_accessors(qw(cache ttl application server));
+our $VERSION = '0.32';
 our $VALUES = 100;
 
 my $ua = LWP::UserAgent->new();
+$ua->timeout(10);
+$ua->agent("Net::OpenDHT $VERSION");
 
 sub new {
   my $class = shift;
   my $self  = $class->SUPER::new(@_);
-  unless ($self->server) {
-    my $cache = App::Cache->new({ ttl => 24*60*60 });
-    my $server = $cache->get_code("server", sub { $self->_find_server() });
-    $self->server($server);
-  }
+  $self->cache(App::Cache->new({ ttl => 24*60*60 }));
+  $self->_set_server unless $self->server;
   return $self;
+}
+
+sub _set_server {
+  my $self = shift;
+  my $server = $self->cache->get_code("server", sub { $self->_find_server() });
+  $self->server($server);
 }
 
 sub _find_server {
@@ -55,6 +60,25 @@ sub _find_server {
 }
 
 sub _make_request {
+  my($self, $xml) = @_;
+  my $response;
+  eval {
+    $response = $self->_make_request_aux($xml);
+  };
+  return $response unless $@;
+  eval {
+    $self->cache->delete("server");
+    $self->_set_server;
+  };
+  die "Error finding server: $@" if $@;
+  eval {
+    $response = $self->_make_request_aux($xml);
+  };
+  return $response unless $@;
+  die "Error making request: $@";
+}
+
+sub _make_request_aux {
  my($self, $xml) = @_;
 
   my $server = $self->server || die "No server";
@@ -114,8 +138,15 @@ sub put {
   my $doc = $parser->parse_string($response->content);
   my $status = $doc->findvalue("/methodResponse/params/param/value/int");
 
-  die "Unknown status $status" unless $status eq '0';
-	return;
+  if ($status == 0) {
+    return;
+  } elsif ($status == 1) {
+    die "Status 1 returned: over capacity";
+  } elsif ($status == 2) {
+    die "Status 2 returned: try again";
+  } else {
+    die "Unknown status $status";
+  }
 }
 
 sub _put_xml {  
@@ -273,10 +304,11 @@ pass in a time to live in seconds:
 
 =head2 server
 
-The module automatically finds a topologically-close gateway to the DHT.
-It will initially start up slowly as it tries to discover a fast gateway
-but this information will be cached for a day. You may override this and
-provide your own gateway with this method:
+The module automatically finds a topologically-close gateway to the DHT. It
+will initially start up slowly as it tries to discover a fast gateway but this
+information will be cached for a day (or until the current server stops
+responding, in which case a new server will be found). You may override this
+and provide your own gateway with this method:
 
   $dht->server($server);
 

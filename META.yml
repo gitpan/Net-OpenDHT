@@ -1,6 +1,6 @@
 ---
 name: Net-OpenDHT
-version: 0.31
+version: 0.32
 author:
   - Leon Brocard <acme@astray.com>.
 abstract: Access the Open Distributed Hash Table (Open DHT)
@@ -18,5 +18,5 @@ requires:
 provides:
   Net::OpenDHT:
     file: lib/Net/OpenDHT.pm
-    version: 0.31
+    version: 0.32
 generated_by: Module::Build version 0.2611

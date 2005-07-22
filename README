@@ -63,8 +63,9 @@ METHODS
   server
     The module automatically finds a topologically-close gateway to the DHT.
     It will initially start up slowly as it tries to discover a fast gateway
-    but this information will be cached for a day. You may override this and
-    provide your own gateway with this method:
+    but this information will be cached for a day (or until the current
+    server stops responding, in which case a new server will be found). You
+    may override this and provide your own gateway with this method:
 
       $dht->server($server);
 

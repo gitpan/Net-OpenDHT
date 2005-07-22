@@ -2,7 +2,7 @@
 use strict;
 use warnings;
 no warnings 'once';
-use Test::More tests => 5;
+use Test::More tests => 7;
 use_ok('Net::OpenDHT');
 
 my $dht = Net::OpenDHT->new();
@@ -24,3 +24,9 @@ foreach my $i (1..10) {
 }
 $Net::OpenDHT::VALUES = 5; # test the placemark
 is_deeply([$dht->fetch($key2)], [1,2,3,4,5,6,7,8,9,10]);
+
+my $key3 = 'simple.t: key' . int(rand(100_000));
+$dht->put($key3, "foo", 60*10);
+is_deeply([$dht->fetch($key3)], ["foo"]);
+$dht->server("not.a.real.host");
+is_deeply([$dht->fetch($key3)], ["foo"]);
