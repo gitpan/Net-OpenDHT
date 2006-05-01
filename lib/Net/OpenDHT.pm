@@ -3,229 +3,190 @@ use strict;
 use warnings;
 use HTTP::Request;
 use List::Util qw(shuffle);
-use App::Cache;
 use LWP::UserAgent;
 use MIME::Base64;
 use Time::HiRes qw(time);
 use XML::LibXML;
 use base 'Class::Accessor::Chained::Fast';
-__PACKAGE__->mk_accessors(qw(cache ttl application server));
-our $VERSION = '0.32';
-our $VALUES = 100;
+__PACKAGE__->mk_accessors(qw(ttl application server));
+our $VERSION = '0.33';
+our $VALUES  = 100;
 
 my $ua = LWP::UserAgent->new();
 $ua->timeout(10);
 $ua->agent("Net::OpenDHT $VERSION");
 
 sub new {
-  my $class = shift;
-  my $self  = $class->SUPER::new(@_);
-  $self->cache(App::Cache->new({ ttl => 24*60*60 }));
-  $self->_set_server unless $self->server;
-  return $self;
-}
-
-sub _set_server {
-  my $self = shift;
-  my $server = $self->cache->get_code("server", sub { $self->_find_server() });
-  $self->server($server);
-}
-
-sub _find_server {
-  my $self = shift;
-  my $url = 'http://appmanager.berkeley.intel-research.net/plcontrol/apps.php?appid=1001&GROUP=ANY&BUILD=ANY&CSTATUS=STATUS-3&RSTATUS=STATUS-3&GO=GO';
-  my $request = HTTP::Request->new(GET => $url);
-  my $response = $ua->request($request);
-  die "Error fetching $url" unless $response->is_success;
-  my $html = $response->content;
-  my @hosts;
-  while ($html =~ m{<TR><TD><FONT SIZE=2>(.+?)</FONT></TD>}g) {
-    push @hosts, $1;
-  }
-  @hosts = (shuffle @hosts)[0..15];
-  my($fastest_time, $fastest_host) = (999, "");
-  foreach my $host (@hosts) {
-    $request = HTTP::Request->new(GET => "http://$host:5851");
-    my $response = $ua->request($request);
-    my $start = time;
-    $response = $ua->request($request);
-    next unless $response->is_success;
-    my $time = time - $start;
-    if ($time < $fastest_time) {
-      $fastest_time = $time;
-      $fastest_host = $host;
-    }
-  }
-  return $fastest_host;
+    my $class = shift;
+    my $self  = $class->SUPER::new(@_);
+    $self->server('opendht.nyuld.net') unless $self->server;
+    return $self;
 }
 
 sub _make_request {
-  my($self, $xml) = @_;
-  my $response;
-  eval {
-    $response = $self->_make_request_aux($xml);
-  };
-  return $response unless $@;
-  eval {
-    $self->cache->delete("server");
-    $self->_set_server;
-  };
-  die "Error finding server: $@" if $@;
-  eval {
-    $response = $self->_make_request_aux($xml);
-  };
-  return $response unless $@;
-  die "Error making request: $@";
+    my ( $self, $xml ) = @_;
+    my $response;
+    eval { $response = $self->_make_request_aux($xml); };
+    return $response unless $@;
+    eval { $response = $self->_make_request_aux($xml); };
+    return $response unless $@;
+    die "Error making request: $@";
 }
 
 sub _make_request_aux {
- my($self, $xml) = @_;
+    my ( $self, $xml ) = @_;
 
-  my $server = $self->server || die "No server";
-  my $request = HTTP::Request->new(POST => "http://$server:5851/");
-  $request->header(Content_Type => 'text/xml');
-  $request->protocol('HTTP/1.0');
-  $request->content($xml);
-  $request->content_length(length($xml));
+    my $server = $self->server || die "No server";
+    my $request = HTTP::Request->new( POST => "http://$server:5851/" );
+    $request->header( Content_Type => 'text/xml' );
+    $request->protocol('HTTP/1.0');
+    $request->content($xml);
+    $request->content_length( length($xml) );
 
-  my $response = $ua->request($request);
-  die $response->status_line unless $response->is_success;
-  return $response;
-} 
+    my $response = $ua->request($request);
+    die $response->status_line unless $response->is_success;
+    return $response;
+}
 
 sub fetch {
-  my($self, $key) = @_;
-  die "Key '$key' is longer than 20 bytes" if length($key) > 20;
+    my ( $self, $key ) = @_;
+    die "Key '$key' is longer than 20 bytes" if length($key) > 20;
 
-  return $self->_fetch($key, $VALUES, undef);
+    return $self->_fetch( $key, $VALUES, undef );
 }
 
 sub _fetch {
-  my($self, $key, $values, $placemark) = @_;
+    my ( $self, $key, $values, $placemark ) = @_;
 
-  my $xml = $self->_fetch_xml($key, $values, $placemark);
-  my $response = $self->_make_request($xml);
+    my $xml      = $self->_fetch_xml( $key, $values, $placemark );
+    my $response = $self->_make_request($xml);
 
-  my $parser = XML::LibXML->new();
-  my $doc = $parser->parse_string($response->content);
+    my $parser = XML::LibXML->new();
+    my $doc    = $parser->parse_string( $response->content );
 
-  my @nodes = $doc->findnodes("/methodResponse/params/param/value/array/data/value/array/data/*/base64");
-  my @values = map { decode_base64($_->textContent) } @nodes;
+    my @nodes = $doc->findnodes(
+        "/methodResponse/params/param/value/array/data/value/array/data/*/base64"
+    );
+    my @values = map { decode_base64( $_->textContent ) } @nodes;
 
-  $placemark = $doc->findvalue("/methodResponse/params/param/value/array/data/value[2]/base64");
-  if ($placemark) {
-    chomp $placemark;
-    push @values, $self->_fetch($key, $values, $placemark);
-  }
-  
-  if (wantarray) {
-    return @values;
-  } else {
-    return $values[0];
-  }
+    $placemark = $doc->findvalue(
+        "/methodResponse/params/param/value/array/data/value[2]/base64");
+    if ($placemark) {
+        chomp $placemark;
+        push @values, $self->_fetch( $key, $values, $placemark );
+    }
+
+    if (wantarray) {
+        return @values;
+    } else {
+        return $values[0];
+    }
 }
 
 sub put {
-  my($self, $key, $value, $ttl) = @_;
+    my ( $self, $key, $value, $ttl ) = @_;
 
-  die "Key '$key' is longer than 20 bytes" if length($key) > 20;
-  die "Value '$value' is longer than 1024 bytes" if length($value) > 1024;
+    die "Key '$key' is longer than 20 bytes"       if length($key) > 20;
+    die "Value '$value' is longer than 1024 bytes" if length($value) > 1024;
 
-  my $xml = $self->_put_xml($key, $value, $ttl);
-  my $response = $self->_make_request($xml);
-  
-  my $parser = XML::LibXML->new();
-  my $doc = $parser->parse_string($response->content);
-  my $status = $doc->findvalue("/methodResponse/params/param/value/int");
+    my $xml      = $self->_put_xml( $key, $value, $ttl );
+    my $response = $self->_make_request($xml);
 
-  if ($status == 0) {
-    return;
-  } elsif ($status == 1) {
-    die "Status 1 returned: over capacity";
-  } elsif ($status == 2) {
-    die "Status 2 returned: try again";
-  } else {
-    die "Unknown status $status";
-  }
+    my $parser = XML::LibXML->new();
+    my $doc    = $parser->parse_string( $response->content );
+    my $status = $doc->findvalue("/methodResponse/params/param/value/int");
+
+    if ( $status == 0 ) {
+        return;
+    } elsif ( $status == 1 ) {
+        die "Status 1 returned: over capacity";
+    } elsif ( $status == 2 ) {
+        die "Status 2 returned: try again";
+    } else {
+        die "Unknown status $status";
+    }
 }
 
-sub _put_xml {  
-  my($self, $key, $value, $ttl) = @_;
+sub _put_xml {
+    my ( $self, $key, $value, $ttl ) = @_;
 
-  $key = encode_base64($key); chomp $key;
-  $value = encode_base64($value); chomp $value;
+    $key = encode_base64($key);
+    chomp $key;
+    $value = encode_base64($value);
+    chomp $value;
 
-	my $doc = XML::LibXML::Document->new("1.0", "utf8");
-	my $method_call = $doc->createElement("methodCall");
+    my $doc         = XML::LibXML::Document->new( "1.0", "utf8" );
+    my $method_call = $doc->createElement("methodCall");
 
-	$method_call->appendTextChild(methodName => "put");
-	my $params = $doc->createElement("params");
+    $method_call->appendTextChild( methodName => "put" );
+    my $params = $doc->createElement("params");
 
- 	my $key_param = $doc->createElement("param");
-  my $key_value = $doc->createElement("value");
-  $key_value->appendTextChild("base64" => $key);
-  $key_param->addChild($key_value);
- 	$method_call->addChild($key_param);
+    my $key_param = $doc->createElement("param");
+    my $key_value = $doc->createElement("value");
+    $key_value->appendTextChild( "base64" => $key );
+    $key_param->addChild($key_value);
+    $method_call->addChild($key_param);
 
- 	my $value_param = $doc->createElement("param");
-  my $value_value = $doc->createElement("value");
-  $value_value->appendTextChild("base64" => $value);
-  $value_param->addChild($value_value);
-  $method_call->addChild($value_param);
+    my $value_param = $doc->createElement("param");
+    my $value_value = $doc->createElement("value");
+    $value_value->appendTextChild( "base64" => $value );
+    $value_param->addChild($value_value);
+    $method_call->addChild($value_param);
 
- 	my $ttl_param = $doc->createElement("param");
-  my $ttl_value = $doc->createElement("value");
-  $ttl_value->appendTextChild("int" => $ttl);
-  $ttl_param->addChild($ttl_value);
-  $method_call->addChild($ttl_param);
+    my $ttl_param = $doc->createElement("param");
+    my $ttl_value = $doc->createElement("value");
+    $ttl_value->appendTextChild( "int" => $ttl );
+    $ttl_param->addChild($ttl_value);
+    $method_call->addChild($ttl_param);
 
- 	my $app_param = $doc->createElement("param");
- 	$app_param->appendTextChild("value" => $self->application);
-	$method_call->addChild($app_param);
+    my $app_param = $doc->createElement("param");
+    $app_param->appendTextChild( "value" => $self->application );
+    $method_call->addChild($app_param);
 
-  $method_call->addChild($params);
-  $doc->setDocumentElement($method_call);
-	return $doc->toString(1);
+    $method_call->addChild($params);
+    $doc->setDocumentElement($method_call);
+    return $doc->toString(1);
 }
 
-sub _fetch_xml {  
-  my($self, $key, $values, $placemark) = @_;
+sub _fetch_xml {
+    my ( $self, $key, $values, $placemark ) = @_;
 
-  $key = encode_base64($key); chomp $key;
-  $values ||= 1;
-  $placemark ||= "";
-  
-	my $doc = XML::LibXML::Document->new("1.0", "utf8");
-	my $method_call = $doc->createElement("methodCall");
+    $key = encode_base64($key);
+    chomp $key;
+    $values    ||= 1;
+    $placemark ||= "";
 
-	$method_call->appendTextChild(methodName => "get");
-	my $params = $doc->createElement("params");
+    my $doc         = XML::LibXML::Document->new( "1.0", "utf8" );
+    my $method_call = $doc->createElement("methodCall");
 
- 	my $key_param = $doc->createElement("param");
-  my $key_value = $doc->createElement("value");
-  $key_value->appendTextChild("base64" => $key);
-  $key_param->addChild($key_value);
- 	$method_call->addChild($key_param);
+    $method_call->appendTextChild( methodName => "get" );
+    my $params = $doc->createElement("params");
 
- 	my $ttl_param = $doc->createElement("param");
-  my $ttl_value = $doc->createElement("value");
-  $ttl_value->appendTextChild("int" => $values);
-  $ttl_param->addChild($ttl_value);
-  $method_call->addChild($ttl_param);
+    my $key_param = $doc->createElement("param");
+    my $key_value = $doc->createElement("value");
+    $key_value->appendTextChild( "base64" => $key );
+    $key_param->addChild($key_value);
+    $method_call->addChild($key_param);
 
- 	my $value_param = $doc->createElement("param");
-  my $value_value = $doc->createElement("value");
-  $value_value->appendTextChild("base64" => $placemark);
-  $value_param->addChild($value_value);
-  $method_call->addChild($value_param);
+    my $ttl_param = $doc->createElement("param");
+    my $ttl_value = $doc->createElement("value");
+    $ttl_value->appendTextChild( "int" => $values );
+    $ttl_param->addChild($ttl_value);
+    $method_call->addChild($ttl_param);
 
- 	my $app_param = $doc->createElement("param");
- 	$app_param->appendTextChild("value" => $self->application);
-	$method_call->addChild($app_param);
+    my $value_param = $doc->createElement("param");
+    my $value_value = $doc->createElement("value");
+    $value_value->appendTextChild( "base64" => $placemark );
+    $value_param->addChild($value_value);
+    $method_call->addChild($value_param);
 
-  $method_call->addChild($params);
-  $doc->setDocumentElement($method_call);
-	return $doc->toString(1);
+    my $app_param = $doc->createElement("param");
+    $app_param->appendTextChild( "value" => $self->application );
+    $method_call->addChild($app_param);
+
+    $method_call->addChild($params);
+    $doc->setDocumentElement($method_call);
+    return $doc->toString(1);
 }
 
 1;
@@ -304,11 +265,9 @@ pass in a time to live in seconds:
 
 =head2 server
 
-The module automatically finds a topologically-close gateway to the DHT. It
-will initially start up slowly as it tries to discover a fast gateway but this
-information will be cached for a day (or until the current server stops
-responding, in which case a new server will be found). You may override this
-and provide your own gateway with this method:
+The module automatically finds a topologically-close gateway to the
+DHT via the CoralCDN OASIS service. You may override this and provide
+your own gateway with this method:
 
   $dht->server($server);
 
@@ -318,7 +277,7 @@ Leon Brocard <acme@astray.com>.
 
 =head1 COPYRIGHT
 
-Copyright (C) 2005, Leon Brocard
+Copyright (C) 2005-6, Leon Brocard
 
 This module is free software; you can redistribute it or modify it
 under the same terms as Perl itself.

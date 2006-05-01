@@ -1,5 +1,8 @@
 Revision history for Perl module Net::OpenDHT:
 
+0.33 Mon May  1 10:44:28 BST 2006
+  - automatically find a close server via CoralCDN OASIS
+
 0.32 Fri Jul 22 23:28:22 BST 2005
   - set user agent to our $VERSION
   - try and get another server if the current one goes away
